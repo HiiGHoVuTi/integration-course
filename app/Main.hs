@@ -5,6 +5,7 @@
 {-# LANGUAGE LambdaCase #-}
 module Main where
 
+import API
 import Control.Concurrent.MVar qualified as MVar
 import Control.Monad.Except
 import Effectful hiding ((:>))
@@ -12,12 +13,9 @@ import Effectful qualified
 import Effectful.Error.Static
 import Servant
 import Network.Wai.Handler.Warp
-import Data.Word (Word64)
 import Data.Aeson
-import GHC.Generics
 import Effectful.Concurrent.MVar
 import Effectful.Reader.Static
-import GHC.Natural
 import Control.Concurrent (forkIO, killThread)
 import Effectful.Dispatch.Dynamic
 import Data.Sequence
@@ -32,59 +30,6 @@ type (||>) = (Effectful.:>)
 
 -- api
 
-newtype Id = MkId Int
-  deriving (Eq, ToJSON, FromJSON)
-newtype Team = MkTeam Natural
-  deriving (Eq, ToJSON, FromJSON)
-newtype Location = MkLocation (Double, Double)
-  deriving (Eq, ToJSON, FromJSON)
-newtype Date = MkDate Integer
-  deriving (Eq, ToJSON, FromJSON)
-
-data UpdateData = MkUpdateData
-  { uMonuments :: [(Team, Monument)]
-  , uPoteaux :: [(Team, Poteau)]
-  }
-  deriving (Generic, Eq)
-instance ToJSON UpdateData
-
-data Poteau = MkPoteau 
-  { pLocation :: Location
-  , pDate :: Date
-  , pTeam :: Team
-  }
-  deriving (Generic, Eq)
-instance ToJSON Poteau
-
-data Monument = MkMonument
-  { mId :: Id
-  , mLocation :: Location
-  , mNom :: String
-  , mTeam :: Team
-  }
-  deriving (Generic, Eq)
-instance ToJSON Monument
-
-data Claim 
-  = ClaimPoteau 
-  { cTeam :: Team
-  , cLoc :: Location
-  , cpNb :: Natural
-  , cDate :: Date
-  }
-  | ClaimMonument
-  { cTeam :: Team
-  , cMonId :: Id
-  , cDate :: Date
-  }
-  deriving (Generic, Eq)
-instance ToJSON Claim
-instance FromJSON Claim
-
-type API 
-  = "ready" :> Get '[JSON] Bool
-  :<|> "update" :> Get '[JSON] UpdateData
-  :<|> "claim" :> ReqBody '[JSON] Claim :> Post '[JSON] Bool
 
 proxy :: Proxy API
 proxy = Proxy @API
