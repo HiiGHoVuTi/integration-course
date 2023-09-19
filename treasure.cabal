@@ -1,0 +1,35 @@
+cabal-version:      3.0
+name:               treasure
+version:            0.1.0.0
+-- synopsis:
+-- description:
+license:            GPL-3.0-only
+license-file:       LICENSE
+author:             Maxime
+maintainer:         maxime@null.net
+-- copyright:
+category:           Game
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+-- extra-source-files:
+
+common warnings
+    ghc-options: -Wall
+
+executable treasure
+    import:           warnings
+    main-is:          Main.hs
+    other-modules:    
+    -- other-extensions:
+    build-depends:    base ^>=4.18.0.0
+                    , containers
+                    , bytestring
+                    , aeson
+                    , effectful
+                    , mtl
+                    , servant
+                    , servant-server
+                    , wai
+                    , warp
+    hs-source-dirs:   app
+    default-language: GHC2021
