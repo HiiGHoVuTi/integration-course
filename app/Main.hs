@@ -12,12 +12,14 @@ import Control.Concurrent.MVar qualified as MVar
 import Control.Monad
 import Control.Monad.Except
 import Data.Aeson
+import Data.Bifunctor
 import Data.ByteString.Lazy.Char8 qualified as B
 import Data.Coerce
 import Data.Foldable
 import Data.IntMap
 import Data.Maybe
 import Data.Sequence
+import Data.Time
 import Data.Time.Clock.POSIX
 import Effectful hiding ((:>))
 import Effectful qualified
@@ -26,8 +28,10 @@ import Effectful.Dispatch.Dynamic
 import Effectful.Error.Static
 import Effectful.FileSystem
 import Effectful.Reader.Static
+import GHC.Natural
 import Network.Wai.Handler.Warp
 import Servant
+import System.IO
 
 type (||>) = (Effectful.:>)
 
@@ -113,12 +117,27 @@ updatePage :: (Concurrent ||> es, Reader SynchronisingState ||> es) => Eff es Up
 updatePage = do
   isReady <- asks readyVar >>= fmap not . isEmptyMVar
   if isReady
-    then
+    then do
+      monuments <- readMVar =<< asks capturedMonumentsVar
+      poteaux <- readMVar =<< asks capturedPoteauxVar
       ReadyUpdateData
-        <$> join (asks (readMVar . capturedMonumentsVar))
-        <*> join (asks (readMVar . capturedPoteauxVar))
-        <*> join (asks (readMVar . readyVar))
+        monuments
+        poteaux
+        (scores monuments poteaux)
+        <$> join (asks (readMVar . readyVar))
     else pure NotReady
+  where
+    scores :: a -> [(Team, Poteau)] -> [(Team, Natural)]
+    scores _mon pot =
+      fmap (first (coerce @Natural . fromIntegral))
+        . Data.IntMap.toList
+        $ Data.Foldable.foldl'
+          (Data.IntMap.unionWith (+))
+          mempty
+          (potScore <$> pot)
+
+    potScore :: (Team, Poteau) -> IntMap Natural
+    potScore (t, MkPoteau {..}) = Data.IntMap.singleton (fromEnum t) pNb
 
 claimPage :: (Log Claim ||> es, Reader SynchronisingState ||> es, Concurrent ||> es, IOE ||> es) => Claim -> Eff es Bool
 claimPage claim = do
@@ -149,17 +168,34 @@ move p f aVar bVar = do
   MVar.modifyMVar_ aVar (pure . Prelude.filter (not . p))
   MVar.modifyMVar_ bVar (pure . (f x :))
 
+printClaim :: Int -> Claim -> IO ()
+printClaim k (ClaimMonument t i d) = do
+  putStrLn (show k <> "- Monument Claim by Team " <> show (coerce @Team @Natural t))
+  putStrLn ("--- Monument #" <> show (coerce @Id @Int i))
+  putStrLn ("--- " <> formatTime defaultTimeLocale "%H:%M:%S" (posixSecondsToUTCTime (fromInteger (coerce d))))
+printClaim k (ClaimPoteau t l n d) = do
+  putStrLn (show k <> "- Poteau Claim by Team " <> show (coerce @Team @Natural t))
+  putStrLn ("--- Claim of " <> show n <> " poteaux")
+  putStrLn ("--- Location" <> show (coerce @Location @(Double, Double) l))
+  putStrLn ("--- " <> formatTime defaultTimeLocale "%H:%M:%S" (posixSecondsToUTCTime (fromInteger (coerce d))))
+
 replLoop :: SynchronisingState -> IO ()
 replLoop sync = loop
   where
     loop = do
+      putStr "> "
+      hFlush stdout
       input <- getLine
       case words input of
         [x] | x `elem` ["quit", "exit"] -> pure ()
+        ["clear"] -> do
+          putStr "\ESC[2J"
+          hFlush stdout
+          loop
         ["claims"] -> do
           claims <- MVar.readMVar (activeClaimsVar sync)
           traverse_
-            (B.putStrLn . encode)
+            (uncurry printClaim)
             (Prelude.zip [0 :: Int ..] (Data.Foldable.toList claims))
           loop
         ["reject", n']
@@ -190,7 +226,7 @@ replLoop sync = loop
                         (pure . ((cTeam, mon) :))
                     ClaimPoteau {..} -> do
                       date <- currentDate
-                      let nouveauPoteau = MkPoteau cLoc date cTeam
+                      let nouveauPoteau = MkPoteau cLoc date cTeam cpNb
                       MVar.modifyMVar_
                         (capturedPoteauxVar sync)
                         (pure . ((cTeam, nouveauPoteau) :))

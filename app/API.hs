@@ -11,7 +11,7 @@ newtype Id = MkId Int
   deriving (Eq, ToJSON, FromJSON)
 
 newtype Team = MkTeam Natural
-  deriving (Eq, ToJSON, FromJSON)
+  deriving (Eq, Enum, ToJSON, FromJSON)
 
 newtype Location = MkLocation (Double, Double)
   deriving (Eq, ToJSON, FromJSON)
@@ -24,6 +24,7 @@ data UpdateData
   | ReadyUpdateData
       { uMonuments :: [(Team, Monument)],
         uPoteaux :: [(Team, Poteau)],
+        uScores :: [(Team, Natural)],
         uStartTime :: Date
       }
   deriving (Generic, Eq)
@@ -33,7 +34,8 @@ instance ToJSON UpdateData
 data Poteau = MkPoteau
   { pLocation :: Location,
     pDate :: Date,
-    pTeam :: Team
+    pTeam :: Team,
+    pNb :: Natural
   }
   deriving (Generic, Eq)
 
