@@ -34,7 +34,7 @@
           buildInputs = with pkgs; [
             haskellPackages.haskell-language-server # you must build it with your ghc to work
             haskellPackages.ghc
-            ghcid
+            ghcid ormolu
             cabal-install
 
             zlib

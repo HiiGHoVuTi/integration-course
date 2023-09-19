@@ -145,6 +145,11 @@ replLoop sync = loop
             (B.putStrLn . encode)
             (Prelude.zip [0 :: Int ..] (Data.Foldable.toList claims))
           loop
+        ["refuse", n']
+          | all (`elem` ['0' .. '9']) n' -> do
+            let n = read @Int n'
+            MVar.modifyMVar_ (activeClaimsVar sync)
+              (pure . deleteAt n)
         ["validate", n']
           | all (`elem` ['0' .. '9']) n' -> do
               let n = read @Int n'
