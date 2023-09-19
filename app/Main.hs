@@ -26,6 +26,7 @@ import Effectful.Error.Static
 import Effectful.Reader.Static
 import Network.Wai.Handler.Warp
 import Servant
+import Effectful.FileSystem
 
 type (||>) = (Effectful.:>)
 
@@ -47,13 +48,15 @@ data SynchronisingState = MkSync
   }
 
 initSyncState :: IO SynchronisingState
-initSyncState = runEff . runConcurrent $ do
-  readyVar <- newEmptyMVar
-  -- read file ?
-  freeMonumentsVar <- newMVar mempty
-  capturedPoteauxVar <- newMVar mempty
-  capturedMonumentsVar <- newMVar mempty
-  activeClaimsVar <- newMVar mempty
+initSyncState = do
+  readyVar <- MVar.newEmptyMVar
+  monuments <- fromMaybe [] <$> do
+    guard =<< runEff (runFileSystem (doesFileExist "monuments.json"))
+    decode <$> B.readFile "monuments.json"
+  freeMonumentsVar <- MVar.newMVar (Data.IntMap.fromList [(coerce mId m, m) | m <- monuments])
+  capturedPoteauxVar <- MVar.newMVar mempty
+  capturedMonumentsVar <- MVar.newMVar mempty
+  activeClaimsVar <- MVar.newMVar mempty
   pure MkSync {..}
 
 data Log s :: Effect where

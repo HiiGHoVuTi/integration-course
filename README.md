@@ -45,6 +45,10 @@ ou sans nix, `cabal build`.
 
 Voir la définition du type [`API`](https://github.com/HiiGHoVuTi/integration-course/blob/main/app/API.hs).
 
+### Fichiers
+
+Si un fichier `monuments.json` contenant une liste de monuments formattés comme l'`API` l'exige, alors cette liste sera chargée en mémoire au lancement du serveur.
+
 ### Ligne de commandes
 
 Lorsque le serveur est lancé, vous pouvez entrer l'une des commandes suivantes:

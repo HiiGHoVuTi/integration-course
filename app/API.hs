@@ -46,6 +46,8 @@ data Monument = MkMonument
 
 instance ToJSON Monument
 
+instance FromJSON Monument
+
 data Claim
   = ClaimPoteau
       { cTeam :: Team,
