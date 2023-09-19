@@ -23,10 +23,10 @@ import Effectful qualified
 import Effectful.Concurrent.MVar
 import Effectful.Dispatch.Dynamic
 import Effectful.Error.Static
+import Effectful.FileSystem
 import Effectful.Reader.Static
 import Network.Wai.Handler.Warp
 import Servant
-import Effectful.FileSystem
 
 type (||>) = (Effectful.:>)
 
@@ -50,9 +50,12 @@ data SynchronisingState = MkSync
 initSyncState :: IO SynchronisingState
 initSyncState = do
   readyVar <- MVar.newEmptyMVar
-  monuments <- fromMaybe [] <$> do
-    guard =<< runEff (runFileSystem (doesFileExist "monuments.json"))
-    decode <$> B.readFile "monuments.json"
+  monuments <-
+    fromMaybe [] <$> do
+      monExists <- runEff (runFileSystem (doesFileExist "monuments.json"))
+      if monExists
+        then decode <$> B.readFile "monuments.json"
+        else pure Nothing
   freeMonumentsVar <- MVar.newMVar (Data.IntMap.fromList [(coerce mId m, m) | m <- monuments])
   capturedPoteauxVar <- MVar.newMVar mempty
   capturedMonumentsVar <- MVar.newMVar mempty
@@ -150,9 +153,10 @@ replLoop sync = loop
           loop
         ["refuse", n']
           | all (`elem` ['0' .. '9']) n' -> do
-            let n = read @Int n'
-            MVar.modifyMVar_ (activeClaimsVar sync)
-              (pure . deleteAt n)
+              let n = read @Int n'
+              MVar.modifyMVar_
+                (activeClaimsVar sync)
+                (pure . deleteAt n)
         ["validate", n']
           | all (`elem` ['0' .. '9']) n' -> do
               let n = read @Int n'
