@@ -31,5 +31,6 @@ executable treasure
                     , servant-server
                     , wai
                     , warp
+                    , time
     hs-source-dirs:   app
     default-language: GHC2021

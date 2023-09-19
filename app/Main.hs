@@ -18,6 +18,7 @@ import Data.Foldable
 import Data.IntMap
 import Data.Maybe
 import Data.Sequence
+import Data.Time.Clock.POSIX
 import Effectful hiding ((:>))
 import Effectful qualified
 import Effectful.Concurrent.MVar
@@ -40,7 +41,7 @@ proxy = Proxy @API
 -- * mvar business
 
 data SynchronisingState = MkSync
-  { readyVar :: MVar (),
+  { readyVar :: MVar Date,
     freeMonumentsVar :: MVar (IntMap Monument),
     capturedMonumentsVar :: MVar [(Team, Monument)],
     capturedPoteauxVar :: MVar [(Team, Poteau)],
@@ -99,23 +100,36 @@ naturalTransformation s =
 
 -- implementation
 
-isReadyPage :: (Concurrent ||> es, Reader SynchronisingState ||> es) => Eff es Bool
+currentDate :: IO Date
+currentDate = MkDate . truncate <$> getPOSIXTime
+
+isReadyPage :: (Concurrent ||> es, Reader SynchronisingState ||> es, IOE ||> es) => Eff es Bool
 isReadyPage = do
   ready <- asks readyVar
+  putMVar ready =<< liftIO currentDate
   not <$> isEmptyMVar ready
 
 updatePage :: (Concurrent ||> es, Reader SynchronisingState ||> es) => Eff es UpdateData
-updatePage =
-  MkUpdateData
-    <$> join (asks (readMVar . capturedMonumentsVar))
-    <*> join (asks (readMVar . capturedPoteauxVar))
+updatePage = do
+  isReady <- asks readyVar >>= fmap not . isEmptyMVar
+  if isReady
+    then
+      ReadyUpdateData
+        <$> join (asks (readMVar . capturedMonumentsVar))
+        <*> join (asks (readMVar . capturedPoteauxVar))
+        <*> join (asks (readMVar . readyVar))
+    else pure NotReady
 
 claimPage :: (Log Claim ||> es, Reader SynchronisingState ||> es, Concurrent ||> es, IOE ||> es) => Claim -> Eff es Bool
 claimPage claim = do
+  isReady <- fmap not . isEmptyMVar =<< asks readyVar
   monuments <- readMVar =<< asks freeMonumentsVar
   let isValid
-        | ClaimMonument {..} <- claim = isJust (monuments Data.IntMap.!? coerce cMonId)
-        | ClaimPoteau {} <- claim = True
+        | ClaimMonument {..} <- claim =
+            isReady
+              && isJust (monuments Data.IntMap.!? coerce cMonId)
+              && cTeam == mTeam (monuments Data.IntMap.! coerce cMonId)
+        | ClaimPoteau {} <- claim = isReady
   when isValid $ do
     send (Log claim)
   pure isValid
@@ -142,22 +156,20 @@ replLoop sync = loop
       input <- getLine
       case words input of
         [x] | x `elem` ["quit", "exit"] -> pure ()
-        ["ready"] ->
-          MVar.putMVar (readyVar sync) ()
-            >> loop
         ["claims"] -> do
           claims <- MVar.readMVar (activeClaimsVar sync)
           traverse_
             (B.putStrLn . encode)
             (Prelude.zip [0 :: Int ..] (Data.Foldable.toList claims))
           loop
-        ["refuse", n']
+        ["reject", n']
           | all (`elem` ['0' .. '9']) n' -> do
               let n = read @Int n'
               MVar.modifyMVar_
                 (activeClaimsVar sync)
                 (pure . deleteAt n)
-        ["validate", n']
+              loop
+        ["accept", n']
           | all (`elem` ['0' .. '9']) n' -> do
               let n = read @Int n'
               claims <- MVar.readMVar (activeClaimsVar sync)
@@ -172,16 +184,17 @@ replLoop sync = loop
                     ClaimMonument {..} -> do
                       monuments <- MVar.readMVar (freeMonumentsVar sync)
                       let mon = monuments Data.IntMap.! (coerce cMonId)
-                      MVar.putMVar (freeMonumentsVar sync) (delete (coerce cMonId) monuments)
+                      MVar.modifyMVar_ (freeMonumentsVar sync) (pure . delete (coerce cMonId))
                       MVar.modifyMVar_
                         (capturedMonumentsVar sync)
                         (pure . ((cTeam, mon) :))
                     ClaimPoteau {..} -> do
-                      let nouveauPoteau = undefined -- FIXME
+                      date <- currentDate
+                      let nouveauPoteau = MkPoteau cLoc date cTeam
                       MVar.modifyMVar_
                         (capturedPoteauxVar sync)
-                        (pure . (nouveauPoteau :))
-                    >> loop
+                        (pure . ((cTeam, nouveauPoteau) :))
+              loop
         _ -> putStrLn "Commande inconnue." >> loop
 
 main :: IO ()

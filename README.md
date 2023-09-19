@@ -53,8 +53,7 @@ Si un fichier `monuments.json` contenant une liste de monuments formattés comme
 
 Lorsque le serveur est lancé, vous pouvez entrer l'une des commandes suivantes:
 - `quit`/`exit` éteint le serveur
-- `ready` indique que la partie peut commencer, `GET /ready` renverra `true`
 - `claims` donne la liste des réclamations faites par les joueurs
-- `validate <n>` permet de valider l'une d'entre elles
-- `refuse <n>` permet de jeter l'une d'entre elles
+- `accept <n>` permet de valider l'une d'entre elles
+- `reject <n>` permet de jeter l'une d'entre elles
 

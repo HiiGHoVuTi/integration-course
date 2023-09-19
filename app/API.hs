@@ -19,10 +19,13 @@ newtype Location = MkLocation (Double, Double)
 newtype Date = MkDate Integer
   deriving (Eq, ToJSON, FromJSON)
 
-data UpdateData = MkUpdateData
-  { uMonuments :: [(Team, Monument)],
-    uPoteaux :: [(Team, Poteau)]
-  }
+data UpdateData
+  = NotReady
+  | ReadyUpdateData
+      { uMonuments :: [(Team, Monument)],
+        uPoteaux :: [(Team, Poteau)],
+        uStartTime :: Date
+      }
   deriving (Generic, Eq)
 
 instance ToJSON UpdateData
@@ -67,6 +70,6 @@ instance ToJSON Claim
 instance FromJSON Claim
 
 type API =
-  "ready" :> Get '[JSON] Bool
+  "ready" :> Post '[JSON] Bool
     :<|> "update" :> Get '[JSON] UpdateData
     :<|> "claim" :> ReqBody '[JSON] Claim :> Post '[JSON] Bool
