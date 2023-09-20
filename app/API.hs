@@ -19,14 +19,13 @@ newtype Location = MkLocation (Double, Double)
 newtype Date = MkDate Integer
   deriving (Eq, ToJSON, FromJSON)
 
-data UpdateData
-  = NotReady
-  | ReadyUpdateData
-      { uMonuments :: [(Team, Monument)],
-        uPoteaux :: [(Team, Poteau)],
-        uScores :: [(Team, Natural)],
-        uStartTime :: Date
-      }
+data UpdateData = ReadyUpdateData
+  { uMonuments :: [(Team, Monument)],
+    uPoteaux :: [(Team, Poteau)],
+    uScores :: [(Team, Natural)],
+    uStartTime :: Date,
+    uIsReady :: Bool
+  }
   deriving (Generic, Eq)
 
 instance ToJSON UpdateData

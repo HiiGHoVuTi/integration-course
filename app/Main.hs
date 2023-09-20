@@ -116,16 +116,19 @@ isReadyPage = do
 updatePage :: (Concurrent ||> es, Reader SynchronisingState ||> es) => Eff es UpdateData
 updatePage = do
   isReady <- asks readyVar >>= fmap not . isEmptyMVar
-  if isReady
-    then do
-      monuments <- readMVar =<< asks capturedMonumentsVar
-      poteaux <- readMVar =<< asks capturedPoteauxVar
-      ReadyUpdateData
-        monuments
-        poteaux
-        (scores monuments poteaux)
-        <$> join (asks (readMVar . readyVar))
-    else pure NotReady
+  monuments <- readMVar =<< asks capturedMonumentsVar
+  poteaux <- readMVar =<< asks capturedPoteauxVar
+  date <-
+    if isReady
+      then join (asks (readMVar . readyVar))
+      else pure (coerce @Integer 0)
+  pure $
+    ReadyUpdateData
+      monuments
+      poteaux
+      (scores monuments poteaux)
+      date
+      isReady
   where
     scores :: a -> [(Team, Poteau)] -> [(Team, Natural)]
     scores _mon pot =
