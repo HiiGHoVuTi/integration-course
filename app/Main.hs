@@ -47,8 +47,8 @@ proxy = Proxy @API
 data SynchronisingState = MkSync
   { readyVar :: MVar Date,
     freeMonumentsVar :: MVar (IntMap Monument),
-    capturedMonumentsVar :: MVar [(Team, Monument)],
-    capturedPoteauxVar :: MVar [(Team, Poteau)],
+    capturedMonumentsVar :: MVar [Monument],
+    capturedPoteauxVar :: MVar [Poteau],
     activeClaimsVar :: MVar (Seq Claim)
   }
 
@@ -130,7 +130,7 @@ updatePage = do
       date
       isReady
   where
-    scores :: a -> [(Team, Poteau)] -> [(Team, Natural)]
+    scores :: [Monument] -> [Poteau] -> [(Team, Natural)]
     scores _mon pot =
       fmap (first (coerce @Natural . fromIntegral))
         . Data.IntMap.toList
@@ -139,8 +139,8 @@ updatePage = do
           mempty
           (potScore <$> pot)
 
-    potScore :: (Team, Poteau) -> IntMap Natural
-    potScore (t, MkPoteau {..}) = Data.IntMap.singleton (fromEnum t) pNb
+    potScore :: Poteau -> IntMap Natural
+    potScore MkPoteau {..} = Data.IntMap.singleton (fromEnum pTeam) pNb
 
 claimPage :: (Log Claim ||> es, Reader SynchronisingState ||> es, Concurrent ||> es, IOE ||> es) => Claim -> Eff es Bool
 claimPage claim = do
@@ -226,13 +226,13 @@ replLoop sync = loop
                       MVar.modifyMVar_ (freeMonumentsVar sync) (pure . delete (coerce cMonId))
                       MVar.modifyMVar_
                         (capturedMonumentsVar sync)
-                        (pure . ((cTeam, mon) :))
+                        (pure . (mon :))
                     ClaimPoteau {..} -> do
                       date <- currentDate
                       let nouveauPoteau = MkPoteau cLoc date cTeam cpNb
                       MVar.modifyMVar_
                         (capturedPoteauxVar sync)
-                        (pure . ((cTeam, nouveauPoteau) :))
+                        (pure . (nouveauPoteau :))
               loop
         _ -> putStrLn "Commande inconnue." >> loop
 

@@ -20,8 +20,8 @@ newtype Date = MkDate Integer
   deriving (Eq, ToJSON, FromJSON)
 
 data UpdateData = ReadyUpdateData
-  { uMonuments :: [(Team, Monument)],
-    uPoteaux :: [(Team, Poteau)],
+  { uMonuments :: [Monument],
+    uPoteaux :: [Poteau],
     uScores :: [(Team, Natural)],
     uStartTime :: Date,
     uIsReady :: Bool
