@@ -195,6 +195,12 @@ replLoop sync = loop
           putStr "\ESC[2J"
           hFlush stdout
           loop
+        ["ready"] ->
+          MVar.putMVar (readyVar sync) =<< currentDate
+        ["save", path] -> do
+          B.writeFile ("monuments-" <> path) . encode =<< MVar.readMVar (capturedMonumentsVar sync)
+          B.writeFile ("poteaux-" <> path) . encode =<< MVar.readMVar (capturedPoteauxVar sync)
+        ["end", "game"] -> void (MVar.takeMVar (readyVar sync))
         ["claims"] -> do
           claims <- MVar.readMVar (activeClaimsVar sync)
           traverse_
